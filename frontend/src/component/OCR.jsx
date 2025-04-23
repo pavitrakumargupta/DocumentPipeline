@@ -5,10 +5,13 @@ import pdfjsWorker from "pdfjs-dist/build/pdf.worker?worker";
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { uploadToS3 } from "../../utils/amazoncred";
+// import { uploadToS3 } from "../../utils/amazoncred";
 // import imageUploader from "../../utils/uploadDoc";
 
+import axios from "axios";
+
 GlobalWorkerOptions.workerPort = new pdfjsWorker();
+
 
 const OCR = ({ setInitialtext }) => {
   const [previewUrl, setPreviewUrl] = useState("");
@@ -19,30 +22,48 @@ const OCR = ({ setInitialtext }) => {
   const [keyPoint, setKeypoint] = useState();
 
   const handleFileChange = async (e) => {
-    const file = e.target.files[0];
+    try {
+      
+      const file = e.target.files[0];
+  
+      if (!file) return;
+  
+      let { data } = await axios.post("http://localhost:5000/upload", {
+        ContentType: file.type,
+        filename: file.name,
+      });
 
-
-    if (!file) return;
-
-    let resp=await uploadToS3(file);
-    console.log("my resep", resp);
-    
-
-    const fileType = file.type;
-    setIsProcessing(true);
-    setError("");
-    setProgress(0);
-    setPreviewUrl("");
-
-    if (fileType === "application/pdf") {
-      await handlePDF(file);
-    } else if (fileType.startsWith("image/")) {
-      const url = URL.createObjectURL(file);
-      setPreviewUrl(url);
-      await handleImage(file);
-    } else {
-      setError("Unsupported file type. Please upload an image or PDF.");
-      setIsProcessing(false);
+      console.log(data);
+      
+  
+      
+      let resp = await axios.put(data.signedUrl, file, {
+        headers: {
+          "Content-Type": file.type,
+        },
+      });
+  
+      console.log(resp);
+  
+      const fileType = file.type;
+      setIsProcessing(true);
+      setError("");
+      setProgress(0);
+      setPreviewUrl("");
+  
+      if (fileType === "application/pdf") {
+        await handlePDF(file);
+      } else if (fileType.startsWith("image/")) {
+        const url = URL.createObjectURL(file);
+        setPreviewUrl(url);
+        await handleImage(file);
+      } else {
+        setError("Unsupported file type. Please upload an image or PDF.");
+        setIsProcessing(false);
+      }
+    } catch (error) {
+      console.log("error",error);
+      
     }
   };
 
@@ -140,7 +161,7 @@ const OCR = ({ setInitialtext }) => {
   };
 
   return (
-    <div style={{ maxWidth: '100%', margin: "auto", padding: 20 }}>
+    <div style={{ maxWidth: "100%", margin: "auto", padding: 20 }}>
       <h2>📄 OCR - Image & PDF (Preview + Chat)</h2>
       <input
         type="file"
@@ -149,7 +170,14 @@ const OCR = ({ setInitialtext }) => {
       />
       {error && <p style={{ color: "red" }}>{error}</p>}
       {isProcessing && <p>🔍 Processing... {progress}%</p>}
-      <div style={{ display: "flex", flex: 1,textAlign:'left' ,justifyContent:'space-evenly'}}>
+      <div
+        style={{
+          display: "flex",
+          flex: 1,
+          textAlign: "left",
+          justifyContent: "space-evenly",
+        }}
+      >
         {previewUrl && (
           <div style={{ marginTop: 20 }}>
             <p>
@@ -166,12 +194,21 @@ const OCR = ({ setInitialtext }) => {
             />
           </div>
         )}
-        <div style={{maxWidth:"50%",}} >
-            <h2>Key points of Resume</h2>
-          <div style={{ maxHeight:"500px",overflowY:'auto',border:'1px solid #fff',margin:'10px',padding:'10px'}}>
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{keyPoint}</ReactMarkdown>
+        <div style={{ maxWidth: "50%" }}>
+          <h2>Key points of Resume</h2>
+          <div
+            style={{
+              maxHeight: "500px",
+              overflowY: "auto",
+              border: "1px solid #fff",
+              margin: "10px",
+              padding: "10px",
+            }}
+          >
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {keyPoint}
+            </ReactMarkdown>
           </div>
-
         </div>
       </div>
     </div>
